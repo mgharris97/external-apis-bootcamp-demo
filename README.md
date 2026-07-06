@@ -2,8 +2,8 @@
 
 This Spring Boot project is the starter for **External APIs in Spring Boot**
 (RestClient and WebClient). Students do **not** build this from scratch - the
-scaffolding (interfaces, config, controller) is already in place, and you
-implement the client logic behind it.
+core (interfaces, config, controller) is already in place, and you
+implement the RestClient & WebClient logic behind it.
 
 ## Domain
 
