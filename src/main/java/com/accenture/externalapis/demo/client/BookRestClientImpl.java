@@ -1,32 +1,74 @@
 package com.accenture.externalapis.demo.client;
 
 import com.accenture.externalapis.demo.config.ExternalServiceProperties;
+import com.accenture.externalapis.demo.dto.BookApiResponse;
+import com.accenture.externalapis.demo.dto.BookDto;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
-// TODO: Make this class implement BookRestClient.
-@Component
-public class BookRestClientImpl {
+import java.util.ArrayList;
+import java.util.List;
 
-    private RestClient restClient;
+@Component
+public class BookRestClientImpl implements BookRestClient {
+
+    private final RestClient restClient;
 
     public BookRestClientImpl(RestClient.Builder builder, ExternalServiceProperties properties) {
-        // TODO: Build the RestClient using builder.baseUrl(properties.baseUrl()).build()
-        // and assign it to this.restClient
-        //
-        // Optional/bonus: this service doesn't require auth, but in a real API you would
-        // often also add builder.defaultHeader("Authorization", "Bearer " + token) here.
+        this.restClient = builder
+                .baseUrl(properties.baseUrl())
+                .build();
     }
 
-    // TODO: Implement getBook(Long id) - fetch one book from GET /books/{id} as a
-    // BookApiResponse, then map it onto a BookDto (only keep the fields BookDto needs).
-    //
-    // TODO: Handle the main RestClient error cases and rethrow them as ClientException:
-    //  - HttpClientErrorException (4xx, e.g. book not found)
-    //  - HttpServerErrorException (5xx, e.g. the faulty/teapot book)
-    //  - ResourceAccessException (connection refused / timeout - the external service is unreachable)
+    @Override
+    public BookDto getBook(Long id) {
+        try {
+            BookApiResponse response = restClient.get()
+                    .uri("/books/{id}", id)
+                    .retrieve()
+                    .body(BookApiResponse.class);
+            return new BookDto(
+                    response.title(),
+                    response.author(),
+                    response.genre(),
+                    response.price()
+            );
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new ClientException("Book not found: " + id, ex);
+        } catch (HttpClientErrorException ex) {
+            throw new ClientException("Client error fetching book " + id + ": " + ex.getStatusCode(), ex);
+        } catch (HttpServerErrorException ex) {
+            throw new ClientException("External service error fetching book " + id + ": " + ex.getStatusCode(), ex);
+        } catch (ResourceAccessException ex) {
+            throw new ClientException("Could not reach external service for book " + id, ex);
+        }
 
-    // TODO: Implement getAllBooks() - fetch all books from GET /books as
-    // BookApiResponse[], then map each one onto a BookDto. Handle the same error
-    // cases as getBook() above.
+    }
+
+    @Override
+    public List<BookDto> getAllBooks() {
+        try {
+            BookApiResponse[] responses = restClient.get()
+                    .uri("/books")
+                    .retrieve()
+                    .body(BookApiResponse[].class);
+
+            List<BookDto> books = new ArrayList<>();
+            for (BookApiResponse response : responses) {
+                books.add(new BookDto(response.title(), response.author(), response.genre(), response.price()));
+            }
+            return books;
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new ClientException("Books endpoint not found", ex);
+        } catch (HttpClientErrorException ex) {
+            throw new ClientException("Client error fetching all books: " + ex.getStatusCode(), ex);
+        } catch (HttpServerErrorException ex) {
+            throw new ClientException("External service error fetching all books: " + ex.getStatusCode(), ex);
+        } catch (ResourceAccessException ex) {
+            throw new ClientException("Could not reach external service while fetching all books", ex);
+        }
+    }
 }
